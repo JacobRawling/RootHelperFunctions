@@ -10,6 +10,7 @@ def open_file(file_name, option="READ" ):
 #
 # Draws a 1D histogram histogram using TTree::Daw
 def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weight,scale = 1.0, draw_options = "e", hist_name = "htemp" ):
+    r.gROOT.SetBatch()
     chain = r.TChain(ntuple_name)
 
     # Support both a list of files and an invidiual file
@@ -50,7 +51,8 @@ def get_2d_histogram(file_name_list,
                      index_variable = None, 
                      draw_options = "",
                      hist_name    = "htemp"):
-    
+    r.gROOT.SetBatch()
+        
     chain = r.TChain(ntuple_name)
 
     # Support both a list of files and an invidiual file
@@ -120,3 +122,12 @@ def normalize_migration_matrix(migration_matrix):
     return migration_matrix
 
 
+def hide_root_infomessages():
+    r.gErrorIgnoreLevel = 1001#r.kPrint
+
+def evaluate_ratio_histogram(numerator_hist,denonimator_hist):
+    ratio_hist = numerator_hist.Clone("ratio_"+numerator_hist.GetName())
+    ratio_hist.Divide(denonimator_hist)
+    ratio_hist.SetDirectory(0)
+    return ratio_hist
+    
