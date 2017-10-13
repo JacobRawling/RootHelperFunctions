@@ -4,7 +4,7 @@ import array
 
 def open_file(file_name, option="READ" ):
     f = r.TFile(file_name,option)
-    assert not f, ("ERROR: failed to open file: ",file_name)
+    assert f, ("ERROR: failed to open file: ",file_name)
     return f
 
 #
@@ -29,7 +29,7 @@ def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weigh
 
     #retrive the histogram from ROOT and free it from this instance in memory 
     htemp = gDirectory.Get("htemp")
-    assert not  isinstance(htemp,r.TH1F),( "ERROR: Failed to open get histogram with variable expression",variable," from files", file_list," is type ",type(htemp))
+    assert isinstance(htemp,r.TH1F),( "ERROR: Failed to open get histogram with variable expression",variable," from files", file_list," is type ",type(htemp))
     htemp.SetDirectory(0)
 
     #let's the user rescale    
