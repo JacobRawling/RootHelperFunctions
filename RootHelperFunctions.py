@@ -130,4 +130,45 @@ def evaluate_ratio_histogram(numerator_hist,denonimator_hist):
     ratio_hist.Divide(denonimator_hist)
     ratio_hist.SetDirectory(0)
     return ratio_hist
+
+def evaluate_ratio_histograms(histograms, denominator_hist_name ):
+    '''
+        brief: turns a dictionary of histograms and key for the denominator histogram into a dictionary of ratio plots 
     
+        histograms: an dictionary of tuples such that 
+                    {
+                     histogram_name: (histogram, style_options, ratio_style_options), 
+                     histogram_2_name: (histogram_2, style_option_2, ratio_style_options_2),
+                    }
+                    style_otion is an instance of the above class StyleOptions, name is a string and histogram is a TH1F 
+        denominator_hist_name: the key in the dictionary histograms to be used as the denominator for the generated ratio plots
+    
+    '''
+    #ensure we've given sensible parameter to this function 
+    assert denominator_hist_name in histograms, "ERROR: Denominator histogram not in input dictioanry."
+    
+    
+    ratio_hists = {}
+    denominator_hist = histograms[denominator_hist_name][0] 
+    
+    max_y,min_y = -1e5, 1e5
+    for name in histograms: 
+        #we don't ever want to evaluate this straight line at y=1.
+        if name == denominator_hist_name:
+            continue 
+    
+        numerator_hist = histograms[name][0] 
+        ratio_style_opts  = histograms[name][2] 
+    
+        ratio_hists[name] = []
+        r_plot = evaluate_ratio_histogram(numerator_hist,denominator_hist)
+        r_plot.SetDirectory(0)
+
+        max_y = max(r_plot.GetMaximum(),max_y)
+        min_y = min(r_plot.GetMinimum(),min_y)
+
+        ratio_hists[name].append( r_plot)
+        ratio_hists[name].append( ratio_style_opts)
+    
+    return ratio_hists, max_y,min_y
+
