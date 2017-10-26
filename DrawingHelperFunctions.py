@@ -18,6 +18,7 @@ class StyleOptions:
         marker_color   = r.kBlack,
         marker_style   = 20,
         marker_size    = 0.045,
+        line_width     = 2,
         legend_options = "l",
         y_divisions    = None,
         x_label_size   = None,
@@ -32,6 +33,7 @@ class StyleOptions:
         self.line_style   = line_style  
         self.fill_color   = fill_color  
         self.fill_style   = fill_style 
+        self.line_width   = line_width
         self.marker_color = marker_color
         self.marker_style = marker_style
         self.marker_size  = marker_size
@@ -39,7 +41,6 @@ class StyleOptions:
         self.y_divisions    = y_divisions
         self.x_label_size   = x_label_size
         self.y_label_size   = y_label_size
-        print "y_label_size = ", self.y_label_size
         self.x_title_size    = x_title_size
         self.x_title_offset = x_title_offset
         self.y_title_size   = y_title_size
@@ -135,6 +136,8 @@ def set_style_options(hist,style_options):
     hist.SetFillColor(style_options.fill_color  )
     hist.SetFillStyle(style_options.fill_style  )
     hist.SetMarkerColor(style_options.marker_color)
+    hist.SetLineColor(style_options.line_color)
+    hist.SetLineWidth(style_options.line_width)
     # hist.SetMarkerSize(style_options.marker_size )
     if  style_options.y_divisions != None:
         hist .GetYaxis().SetNdivisions(style_options.y_divisions)   
@@ -148,11 +151,7 @@ def set_style_options(hist,style_options):
     # 
 
     if  style_options.y_label_size != None:
-        print "SETITNG y_label_size = ", style_options.y_label_size
         hist .GetYaxis().SetLabelSize(style_options.y_label_size)
-    else: 
-        print "NOT SETITNG y_label_size = ", style_options.y_label_size
-
     if  style_options.y_title_size != None:
         hist .GetYaxis().SetTitleSize(style_options.y_title_size)
     if  style_options.y_title_offset != None:
@@ -160,7 +159,7 @@ def set_style_options(hist,style_options):
     return hist
  
 def draw_atlas_details(labels,x_pos= 0.2,y_pos = 0.87, dy = 0.04,text_size = 0.035):
-    AS.ATLASLabel(   x_pos,y_pos,1,dy*2.2,dy,"Simulation Internal")
+    AS.ATLASLabel(   x_pos,y_pos,1,dy*3.2,dy,"Simulation Internal")
     y_pos -= dy
     AS.myText(       x_pos,y_pos,1,dy,AS.lumi_string)
     y_pos -= dy
@@ -181,19 +180,60 @@ def create_legend(histograms):
     r.gStyle.SetFrameBorderSize(0)
     r.gStyle.SetLegendBorderSize(0)
     legend = r.TLegend(0.6,0.9-len(histograms)*0.05,0.9,0.9)
-    legend.SetTextSize(0.045)
+    legend.SetTextSize(0.04)
     legend.SetFillColor(0)
     legend.SetLineWidth(0)
     legend.SetFillStyle(0)
     legend.SetNColumns(1)
 
-    print "len(histograms) = ",len(histograms)
     for name in histograms:
-        print "ADDING LEGEND ENTRY: ",histograms[name][0],name,histograms[name][1].legend_options 
-
         legend.AddEntry(histograms[name][0],name,histograms[name][1].legend_options)
 
+    r.SetOwnership( legend, 0 ) 
     return legend
+
+def plot_histogram(canvas, histograms, labels = []):
+    '''
+        canvas: TCanvas that will be drawn upon 
+        histograms: a dictionary of tuples that will be drawn, scuh that 
+                    {
+                        histogram_name: (histogram, style_options),
+
+                    }
+    '''
+    #divide the canvas into 
+    canvas.Clear()
+    canvas.cd()
+
+    AS.SetAtlasStyle()
+    r.gStyle.SetOptStat(0)
+    r.gPad.Update()
+
+    legend = r.TLegend()#0.6,0.8,0.9,0.9)
+
+    max_y       = get_maximum_y(histograms)*1.35
+    same_string = ""
+    for name in histograms: 
+        #rename the elements of the dictionary 
+        hist = histograms[name][0]#.Clone()
+        hist.SetName(name)
+        hist.SetDirectory(0)
+        style_opts = histograms[name][1]
+
+        #format the histograms into nice lookign things 
+        hist = set_style_options(hist,style_opts)
+        hist.SetMaximum(max_y)
+
+        #draw the histogram
+        legend.AddEntry(hist,name,"l")#style_opts.legend_options)
+        hist.Draw(style_opts.draw_options + same_string)
+        same_string = "same"
+
+
+    #grab and draw the legend     
+    legend = create_legend(histograms)
+    legend.Draw()
+    draw_atlas_details(labels, x_pos = 0.15,y_pos = 0.85, text_size = 0.032)
 
 
 def ratio_plot(canvas, histograms, denominator_hist_name = None):
