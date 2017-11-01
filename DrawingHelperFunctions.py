@@ -4,8 +4,9 @@ from array import array
 import RootHelperFunctions as rhf 
 
 """
+    StyleOptions for a histogram not including the titles of the histogram, this allows the same style options to be used for histograms 
+    showing data from the same source, but of a different type (e.g different MC generators showing different variables)
 
-    
 """
 class StyleOptions:
     def __init__(
@@ -147,7 +148,6 @@ def set_style_options(hist,style_options):
         hist .GetXaxis().SetTitleSize(style_options.x_title_size)
     if  style_options.x_title_offset != None:
         hist .GetXaxis().SetTitleOffset(style_options.x_title_offset)
-
     # 
 
     if  style_options.y_label_size != None:
@@ -156,8 +156,16 @@ def set_style_options(hist,style_options):
         hist .GetYaxis().SetTitleSize(style_options.y_title_size)
     if  style_options.y_title_offset != None:
         hist .GetYaxis().SetTitleOffset(style_options.y_title_offset)
+
     return hist
  
+def draw_bold_title_detials( bold_label, sub_label, labels= [], x_pos=0.2,y_pos=0.87,dy=0.04,text_size =0.035,dr = 0.04*3.5):
+    AS.BoldLabel(   x_pos,y_pos,1,dr,dy,bold_label,sub_label)
+    y_pos -= dy   
+    for label in labels:
+        AS.myText(       x_pos,y_pos,1,text_size, label )
+        y_pos -= dy
+
 def draw_atlas_details(labels,x_pos= 0.2,y_pos = 0.87, dy = 0.04,text_size = 0.035):
     AS.ATLASLabel(   x_pos,y_pos,1,dy*3.2,dy,"Simulation Internal")
     y_pos -= dy
@@ -179,7 +187,12 @@ def get_maximum_y(histograms):
 def create_legend(histograms):
     r.gStyle.SetFrameBorderSize(0)
     r.gStyle.SetLegendBorderSize(0)
-    legend = r.TLegend(0.6,0.9-len(histograms)*0.05,0.9,0.9)
+    n_leg = 0
+    for name in histograms:      
+        if histograms[name][1].legend_options != None:
+            n_leg += 1
+
+    legend = r.TLegend(0.635,0.925-n_leg*0.05,0.925,0.9)
     legend.SetTextSize(0.04)
     legend.SetFillColor(0)
     legend.SetLineWidth(0)
@@ -187,12 +200,13 @@ def create_legend(histograms):
     legend.SetNColumns(1)
 
     for name in histograms:
-        legend.AddEntry(histograms[name][0],name,histograms[name][1].legend_options)
+        if histograms[name][1].legend_options != None:
+            legend.AddEntry(histograms[name][0],name,histograms[name][1].legend_options)
 
     r.SetOwnership( legend, 0 ) 
     return legend
 
-def plot_histogram(canvas, histograms, labels = []):
+def plot_histogram(canvas, histograms, x_axis_title = "x", y_axis_title="Normalized Number of events"):
     '''
         canvas: TCanvas that will be drawn upon 
         histograms: a dictionary of tuples that will be drawn, scuh that 
@@ -211,7 +225,7 @@ def plot_histogram(canvas, histograms, labels = []):
 
     legend = r.TLegend()#0.6,0.8,0.9,0.9)
 
-    max_y       = get_maximum_y(histograms)*1.35
+    max_y       = get_maximum_y(histograms)*1.5
     same_string = ""
     for name in histograms: 
         #rename the elements of the dictionary 
@@ -224,17 +238,26 @@ def plot_histogram(canvas, histograms, labels = []):
         hist = set_style_options(hist,style_opts)
         hist.SetMaximum(max_y)
 
+        hist.GetXaxis().SetTitle(x_axis_title)
+        hist.GetYaxis().SetTitle(y_axis_title)
+
         #draw the histogram
         legend.AddEntry(hist,name,"l")#style_opts.legend_options)
         hist.Draw(style_opts.draw_options + same_string)
-        same_string = "same"
+        same_string = " same"
 
 
     #grab and draw the legend     
     legend = create_legend(histograms)
     legend.Draw()
-    draw_atlas_details(labels, x_pos = 0.15,y_pos = 0.85, text_size = 0.032)
+    # draw_atlas_detailslabels, x_pos = 0.15,y_pos = 0.85, text_size = 0.032)
 
+def th1f_to_tgraph(hist):
+    x_points, y_points = [],[]
+    for i in xrange(1, hist.GetSize()-2):
+        x_points.append(hist.GetBinCenter(i))
+        y_points.append(hist.GetBinContent(i))
+    return r.TGraph( len(x_points),array('d',x_points), array('d',y_points) )
 
 def ratio_plot(canvas, histograms, denominator_hist_name = None):
     '''
