@@ -51,11 +51,22 @@ class StyleOptions:
         self.x_axis_label_offset = x_axis_label_offset
         self.y_axis_label_offset = y_axis_label_offset
 
+    def set_default_ratio_options(self):
+        self.y_divisions    = 503
+        self.y_label_size   = 0.135
+        self.y_title_size   = 0.135
+        self.y_title_offset = 0.45
+        self.x_label_size   = 0.135
+        self.x_title_size    = 0.135
+        self.x_title_offset = 0.87
+        self.x_axis_label_offset = 0.87
+        self.y_axis_label_offset = None
+        self.draw_options="HIST"
 
 data_style_options = StyleOptions(x_label_size = 0.0,
                                   legend_options = "lp")
 mc_style_options   = StyleOptions(
-                                 draw_options = "E2 HIST",
+                                 draw_options = "E1 HIST",
                                  line_color   = r.kBlue,
                                  line_style   = 3,
                                  fill_color   = r.kWhite,
@@ -74,7 +85,8 @@ data_ratio_style_options = StyleOptions(
     x_title_size    = 0.135,
     x_title_offset = 0.87,
     x_axis_label_offset = 0.87,
-    y_axis_label_offset = None
+    y_axis_label_offset = None,
+    draw_options="HIST"
     )
 
 
@@ -159,6 +171,7 @@ def set_style_options(hist,style_options):
         hist .GetXaxis().SetTitleSize(style_options.x_title_size)
     if  style_options.x_title_offset != None:
         hist .GetXaxis().SetTitleOffset(style_options.x_title_offset)
+
     # if  style_options.x_axis_label_offset != None:
         # hist.GetXaxis().SetLabelOffset(style_options.x_axis_label_offset)
     if  style_options.y_label_size != None:
@@ -179,7 +192,7 @@ def draw_bold_title_detials( bold_label, sub_label, labels= [], x_pos=0.2,y_pos=
         AS.myText(       x_pos,y_pos,1,text_size, label )
         y_pos -= dy
 
-def draw_atlas_details(labels,x_pos= 0.2,y_pos = 0.87, dy = 0.04,text_size = 0.035):
+def draw_atlas_details(labels,x_pos= 0.2,y_pos = 0.87, dy = 0.045,text_size = 0.04):
     AS.ATLASLabel(   x_pos,y_pos,1,dy*3.2,dy,"Simulation Internal")
     y_pos -= dy
     AS.myText(       x_pos,y_pos,1,dy,AS.lumi_string)
@@ -206,12 +219,17 @@ def create_legend(histograms):
         if histograms[name][1].legend_options != None:
             n_leg += 1
 
-    legend = r.TLegend(0.635,0.925-n_leg*0.05,0.925,0.9)
+    if n_leg > 4:
+        legend = r.TLegend(0.635,0.925-(n_leg/2.0)*0.05,0.925,0.9)
+    else:
+        legend = r.TLegend(0.635,0.925-n_leg*0.05,0.925,0.9)
     legend.SetTextSize(0.04)
     legend.SetFillColor(0)
     legend.SetLineWidth(0)
     legend.SetFillStyle(0)
     legend.SetNColumns(1)
+    if n_leg > 4:
+        legend.SetNColumns(2)
 
     for name in histograms:
         if histograms[name][1].legend_options != None:
@@ -273,11 +291,11 @@ def th1f_to_tgraph(hist):
         y_points.append(hist.GetBinContent(i))
     return r.TGraph( len(x_points),array('d',x_points), array('d',y_points) )
 
-def ratio_plot(canvas, histograms, denominator_hist_name = None, 
+def ratio_plot(canvas, histograms,
             ratio_y_axis_title = "Data/MC", 
             y_axis_title="Normalzied Number of Events", 
             x_axis_title="",
-            divide_by_binwidth=True):
+            messages = ["Combined Regions"]):
     '''
         canvas: TCanvas that will be drawn upon
         histograms: an dictionary of tuples such that 
@@ -286,8 +304,6 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None,
                      histogram_2_name: (histogram_2, style_option_2, ratio_style_options_2),
                     }
                     style_otion is an instance of the above class StyleOptions, name is a string and histogram is a TH1F 
-        denominator_hist_name: by default will take the first histogram in the dictionary, but if specificied will use the 
-                               histogram with this variable's name in the ratio plot
         
         returns: a dictionary of ratio histograms such that
                  { 
@@ -297,7 +313,6 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None,
         ratio_y_axis_title: title of the y axis of the ratio pannel
         y_axis_title: y axis title of the upper pannel plot
         x_axis_title: x axis title of the upper pannel (typically not shown thpugh )
-        divide_by_binwidth: boolean to toggle dividing each bin by it'swidth 
     '''
     AS.SetAtlasStyle()
     r.gStyle.SetOptStat(0)
@@ -314,16 +329,12 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None,
     # upper pannel 
     same_string = ""
 
-    #scale the histograms by bin width if desired
-    if divide_by_binwidth:
-        for name in histograms:          
-            histograms[name][0].Scale(1.0,"width")
-
     #grab the y axis maximum so we can set every histogram to have this same maximum 
     max_y       = get_maximum_y(histograms)*1.35
     for name in histograms: 
         #for clarity cache the histogram and styling options separately
         hist = histograms[name][0]
+
         style_opts = histograms[name][1]
 
         #format the histograms into nice lookign things 
@@ -334,7 +345,7 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None,
         hist.Draw(style_opts.draw_options + same_string)
         same_string = " SAME "
 
-    draw_atlas_details( ["Combined regions"] )
+    draw_atlas_details(messages)
     legend = create_legend(histograms)
     legend.Draw("same")
 
@@ -346,22 +357,15 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None,
     pad2.Draw()
     pad2.cd()
 
-    #we want to use the first element in the dictionary if the denominator_hist_name is not set by the user
-    if denominator_hist_name == None:
-        denominator_hist_name = next(iter(histograms))
-
 
     #first evaluate the ratio plots and determine the maximum and minimum y 
-    ratio_hists,  min_y,max_y = rhf.evaluate_ratio_histograms( histograms, denominator_hist_name )
+    ratio_hists,  min_y,max_y = rhf.evaluate_ratio_histograms( histograms )
     max_y = max(max_y*1.3, (2.0 - min_y)*1.3)
-    max_y = 1.3 
+    max_y = 1.3
     min_y = 2.0 - max_y 
 
     same_string = ""
     for name in ratio_hists: 
-        #we don't want to draw the default straight line at one coloured in whatever style has been chosen for the denom. 
-        if name == denominator_hist_name:
-            continue 
 
         #separate out the histogram and style options 
         ratio_histogram = ratio_hists[name][0]
@@ -378,7 +382,7 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None,
         ratio_histogram.GetXaxis().SetTitle(x_axis_title)
 
         #draw the histogram keeping track of what is the same
-        ratio_histogram.Draw(style_opts.draw_options + same_string)
+        ratio_histogram.Draw(ratio_style_opts.draw_options + same_string)
         same_string = " SAME "
 
     return ratio_hists 

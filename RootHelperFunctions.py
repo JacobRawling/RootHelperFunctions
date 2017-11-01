@@ -103,6 +103,10 @@ def normalize_histogram(hist):
     if integral == 0:
         integral = 1
     hist.Scale(1.0/integral)
+
+    ##typcially if we are normalizing it is useful to also set the minimum to zero
+    # hist.SetMinimum(0)
+
     return hist
 
 def normalize_migration_matrix(migration_matrix):
@@ -131,33 +135,43 @@ def evaluate_ratio_histogram(numerator_hist,denonimator_hist):
     ratio_hist.SetDirectory(0)
     return ratio_hist
 
-def evaluate_ratio_histograms(histograms, denominator_hist_name ):
+def apply_stress(hist,stress):
+    stressed_hist = hist.Clone()
+    stressed_hist.SetDirectory(0)
+    
+    n_bins = hist.GetSize()
+    for i in xrange(1,n_bins):
+        stressed_hist.SetBinContent(i, hist.GetBinContent(i)*(1.0 + stress*float(i)/float(n_bins) ))
+
+    return stressed_hist
+
+def evaluate_ratio_histograms(histograms ):
     '''
         brief: turns a dictionary of histograms and key for the denominator histogram into a dictionary of ratio plots 
     
         histograms: an dictionary of tuples such that 
                     {
-                     histogram_name: (histogram, style_options, ratio_style_options), 
-                     histogram_2_name: (histogram_2, style_option_2, ratio_style_options_2),
+                     histogram_name: (histogram, style_options, ratio_style_options, ratio_hist_string), 
+                     histogram_2_name: (histogram_2, style_option_2, ratio_style_options_2, ratio_hist_string),
                     }
                     style_otion is an instance of the above class StyleOptions, name is a string and histogram is a TH1F 
-        denominator_hist_name: the key in the dictionary histograms to be used as the denominator for the generated ratio plots
+                    ratio_hist_string is the name of the histogram to divide this one by, if it's None then the histogram is not added to the returned histograms
     
-    '''
-    #ensure we've given sensible parameter to this function 
-    assert denominator_hist_name in histograms, "ERROR: Denominator histogram not in input dictioanry."
-    
-    
+    '''      
     ratio_hists = {}
-    denominator_hist = histograms[denominator_hist_name][0] 
     
     max_y,min_y = -1e5, 1e5
     for name in histograms: 
         #we don't ever want to evaluate this straight line at y=1.
-        if name == denominator_hist_name:
-            continue 
+        denominator_hist_name =  histograms[name][3] 
+        if denominator_hist_name == None:
+            continue
+
+        #ensure we've given sensible parameter to this function 
+        assert denominator_hist_name in histograms, "ERROR: Denominator histogram not in input dictioanry."
+        denominator_hist = histograms[denominator_hist_name][0] 
     
-        numerator_hist = histograms[name][0] 
+        numerator_hist    = histograms[name][0] 
         ratio_style_opts  = histograms[name][2] 
     
         ratio_hists[name] = []
