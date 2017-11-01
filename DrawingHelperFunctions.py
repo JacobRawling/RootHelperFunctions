@@ -23,11 +23,13 @@ class StyleOptions:
         legend_options = "l",
         y_divisions    = None,
         x_label_size   = None,
-        y_label_size   = None,
-        x_title_size    = None,
+        x_title_size   = 0.35,
         x_title_offset = None,
-        y_title_size   = None,
-        y_title_offset = None,
+        x_axis_label_offset = None,
+        y_axis_label_offset = None,
+        y_label_size   = 0.05,
+        y_title_size   = 0.05,
+        y_title_offset = 1.1,
         ):
         self.draw_options = draw_options
         self.line_color   = line_color  
@@ -46,9 +48,12 @@ class StyleOptions:
         self.x_title_offset = x_title_offset
         self.y_title_size   = y_title_size
         self.y_title_offset = y_title_offset
+        self.x_axis_label_offset = x_axis_label_offset
+        self.y_axis_label_offset = y_axis_label_offset
 
 
-data_style_options = StyleOptions()
+data_style_options = StyleOptions(x_label_size = 0.0,
+                                  legend_options = "lp")
 mc_style_options   = StyleOptions(
                                  draw_options = "E2 HIST",
                                  line_color   = r.kBlue,
@@ -57,17 +62,21 @@ mc_style_options   = StyleOptions(
                                  fill_style   = 0,
                                  marker_color = r.kBlack,
                                  marker_style = 0,
-                                 marker_size  = 0
+                                 marker_size  = 0,
+                                 x_label_size = 0.0
                                  )
 data_ratio_style_options = StyleOptions(
     y_divisions    = 503,
-    x_label_size   = 0.15,
-    y_label_size   = 0.15,
-    x_title_size    = 0.15,
-    x_title_offset = 0.82,
-    y_title_size   = 0.15,
+    y_label_size   = 0.135,
+    y_title_size   = 0.135,
     y_title_offset = 0.45,
-        )
+    x_label_size   = 0.135,
+    x_title_size    = 0.135,
+    x_title_offset = 0.87,
+    x_axis_label_offset = 0.87,
+    y_axis_label_offset = None
+    )
+
 
 def draw_migration_matrix(matrix):
     AS.SetAtlasStyle()
@@ -139,7 +148,9 @@ def set_style_options(hist,style_options):
     hist.SetMarkerColor(style_options.marker_color)
     hist.SetLineColor(style_options.line_color)
     hist.SetLineWidth(style_options.line_width)
-    # hist.SetMarkerSize(style_options.marker_size )
+    
+    #For all the default options that aren't none we need to check if they're set
+    #and update the histogram accordingly 
     if  style_options.y_divisions != None:
         hist .GetYaxis().SetNdivisions(style_options.y_divisions)   
     if  style_options.x_label_size != None:
@@ -148,14 +159,16 @@ def set_style_options(hist,style_options):
         hist .GetXaxis().SetTitleSize(style_options.x_title_size)
     if  style_options.x_title_offset != None:
         hist .GetXaxis().SetTitleOffset(style_options.x_title_offset)
-    # 
-
+    # if  style_options.x_axis_label_offset != None:
+        # hist.GetXaxis().SetLabelOffset(style_options.x_axis_label_offset)
     if  style_options.y_label_size != None:
         hist .GetYaxis().SetLabelSize(style_options.y_label_size)
     if  style_options.y_title_size != None:
         hist .GetYaxis().SetTitleSize(style_options.y_title_size)
     if  style_options.y_title_offset != None:
         hist .GetYaxis().SetTitleOffset(style_options.y_title_offset)
+    if  style_options.y_axis_label_offset != None:
+        hist.GetYaxis().SetLabelOffset(style_options.y_axis_label_offset)
 
     return hist
  
@@ -187,6 +200,7 @@ def get_maximum_y(histograms):
 def create_legend(histograms):
     r.gStyle.SetFrameBorderSize(0)
     r.gStyle.SetLegendBorderSize(0)
+    r.gStyle.SetLegendFont(42)
     n_leg = 0
     for name in histograms:      
         if histograms[name][1].legend_options != None:
@@ -259,7 +273,11 @@ def th1f_to_tgraph(hist):
         y_points.append(hist.GetBinContent(i))
     return r.TGraph( len(x_points),array('d',x_points), array('d',y_points) )
 
-def ratio_plot(canvas, histograms, denominator_hist_name = None):
+def ratio_plot(canvas, histograms, denominator_hist_name = None, 
+            ratio_y_axis_title = "Data/MC", 
+            y_axis_title="Normalzied Number of Events", 
+            x_axis_title="",
+            divide_by_binwidth=True):
     '''
         canvas: TCanvas that will be drawn upon
         histograms: an dictionary of tuples such that 
@@ -270,12 +288,16 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None):
                     style_otion is an instance of the above class StyleOptions, name is a string and histogram is a TH1F 
         denominator_hist_name: by default will take the first histogram in the dictionary, but if specificied will use the 
                                histogram with this variable's name in the ratio plot
-
+        
         returns: a dictionary of ratio histograms such that
                  { 
                     histogram_name: [raito_histogram, ratio_style_options],
                     histogram_2_name: [raito_histogram, ratio_style_options_2]
                  }
+        ratio_y_axis_title: title of the y axis of the ratio pannel
+        y_axis_title: y axis title of the upper pannel plot
+        x_axis_title: x axis title of the upper pannel (typically not shown thpugh )
+        divide_by_binwidth: boolean to toggle dividing each bin by it'swidth 
     '''
     AS.SetAtlasStyle()
     r.gStyle.SetOptStat(0)
@@ -283,13 +305,21 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None):
     #divide the canvas into 
     canvas.Clear()
     canvas.cd()
-    pad1 =  r.TPad("pad1", "pad1", 0, 0.3, 1, 1.0)
-    pad1.SetBottomMargin(0)
+    pad1 =  r.TPad("pad1", "pad1", 0, 0.31, 1, 1.0)
+    pad1.SetBottomMargin(0.0175)
+    pad1.SetTopMargin(0.06)
     pad1.Draw()
     pad1.cd()
 
     # upper pannel 
     same_string = ""
+
+    #scale the histograms by bin width if desired
+    if divide_by_binwidth:
+        for name in histograms:          
+            histograms[name][0].Scale(1.0,"width")
+
+    #grab the y axis maximum so we can set every histogram to have this same maximum 
     max_y       = get_maximum_y(histograms)*1.35
     for name in histograms: 
         #for clarity cache the histogram and styling options separately
@@ -299,6 +329,7 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None):
         #format the histograms into nice lookign things 
         hist = set_style_options(hist,style_opts)
         hist.SetMaximum(max_y)
+        hist.GetYaxis().SetTitle(y_axis_title)
 
         hist.Draw(style_opts.draw_options + same_string)
         same_string = " SAME "
@@ -309,8 +340,8 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None):
 
     # lower pannel for ratio 
     canvas.cd()
-    pad2 = r.TPad("pad2", "pad2", 0, 0.05, 1, 0.3)
-    pad2.SetTopMargin(0)
+    pad2 = r.TPad("pad2", "pad2", 0, 0.05, 1, 0.295)
+    pad2.SetTopMargin(0.05)
     pad2.SetBottomMargin(0.285)
     pad2.Draw()
     pad2.cd()
@@ -322,7 +353,8 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None):
 
     #first evaluate the ratio plots and determine the maximum and minimum y 
     ratio_hists,  min_y,max_y = rhf.evaluate_ratio_histograms( histograms, denominator_hist_name )
-    max_y = max(max_y*1.3, 2.0 - min_y*1.3)
+    max_y = max(max_y*1.3, (2.0 - min_y)*1.3)
+    max_y = 1.3 
     min_y = 2.0 - max_y 
 
     same_string = ""
@@ -333,22 +365,21 @@ def ratio_plot(canvas, histograms, denominator_hist_name = None):
 
         #separate out the histogram and style options 
         ratio_histogram = ratio_hists[name][0]
-        ratio_style_opts = histograms[name][1] #evaluate_ratio_histograms has already removed the unwanted sytyle opions for the upper pannel
+        ratio_style_opts = histograms[name][2] #evaluate_ratio_histograms has already removed the unwanted sytyle opions for the upper pannel
         
         #format the histogram
         ratio_histogram.SetMaximum(max_y) 
         ratio_histogram.SetMinimum(min_y) 
-
-        print "SETTING RATIO STYLE OPTIONS: ", ratio_style_opts
+        r.TGaxis.SetMaxDigits(3)
         ratio_hists[name][0] = ratio_histogram = set_style_options(ratio_histogram,ratio_style_opts)
-        print "Drawing ",ratio_histogram, "..."
-        print "Setting max to ", max_y
-        print "Setting min to ", min_y
+        
+        ##
+        ratio_histogram.GetYaxis().SetTitle(ratio_y_axis_title)
+        ratio_histogram.GetXaxis().SetTitle(x_axis_title)
 
         #draw the histogram keeping track of what is the same
         ratio_histogram.Draw(style_opts.draw_options + same_string)
         same_string = " SAME "
-    legend.Draw("same")
 
     return ratio_hists 
 
