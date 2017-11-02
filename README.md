@@ -20,7 +20,7 @@ ratio_plot and plot_histogram are the workhorses of this toolkit
 
 Used for sanatizing strings and any manipulation that is commonly needed in a ROOT based analysis. 
 
-##ReweightingTool
+## ReweightingTool
 
 Constructs a formula string that can be attached to weight in a TTree::Draw command to add an event-by-event slope into a distribution. 
 
