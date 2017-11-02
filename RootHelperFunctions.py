@@ -14,7 +14,8 @@ def create_folder(directory):
 
 #
 # Draws a 1D histogram histogram using TTree::Daw
-def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weight,scale = 1.0, draw_options = "e", hist_name = "htemp" ):
+def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weight,scale = 1.0, draw_options = "e", hist_name = "htemp", friend_name = None,
+                     index_variable = None ):
     r.gROOT.SetBatch()
     chain = r.TChain(ntuple_name)
 
@@ -25,6 +26,22 @@ def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weigh
     else:
         chain.Add(file_name_list)
     r.TH1.SetDefaultSumw2()
+
+    # Check to see if the user is attempting to access variables from a friended tree 
+    if friend_name != None:
+        assert index_variable != None,"ERROR: index_variable must be set when using a friend tree"
+        friend_chain = r.TChain(friend_name)
+        
+        if isinstance(file_name_list, list):
+            for file in file_list:
+                friend_chain.Add(file)
+        else:
+            friend_chain.Add(file_name_list)
+
+        friend_chain.BuildIndex(index_variable)
+        chain.BuildIndex(index_variable)
+        chain.AddFriend(friend_chain)
+
 
     if isinstance(x_axis_binning,list) == True: 
         htemp = r.TH1F(hist_name,"",len(x_axis_binning)-1,array.array('d',x_axis_binning))

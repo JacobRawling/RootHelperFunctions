@@ -90,13 +90,23 @@ data_ratio_style_options = StyleOptions(
     )
 
 
-def draw_migration_matrix(matrix):
+def draw_migration_matrix(matrix,canvas):
+    canvas.cd()
+    canvas.Clear()
+
     AS.SetAtlasStyle()
-    r.gStyle.SetPadTopMargin(    0.05)
-    r.gStyle.SetPadRightMargin(  0.15)
-    r.gStyle.SetPadBottomMargin( 0.20)
-    r.gStyle.SetPadLeftMargin(   0.15)
-    r.gPad.Update()
+    canvas.SetTopMargin(    0.1)
+    canvas.SetRightMargin(  0.15)
+    canvas.SetBottomMargin( 0.15)
+    canvas.SetLeftMargin(   0.15)
+
+    #
+    matrix.GetYaxis().SetTitleSize(0.035)
+    matrix.GetYaxis().SetLabelSize(0.035)
+    matrix.GetXaxis().SetTitleSize(0.035)
+    matrix.GetXaxis().SetLabelSize(0.035)
+    matrix.GetZaxis().SetTitleSize(0.035)
+    matrix.GetZaxis().SetLabelSize(0.035)
 
     #nice green color 
     set_palette("green",99)
@@ -110,8 +120,8 @@ def draw_migration_matrix(matrix):
         matrix.Draw("COLZ")
     # matrix.Scale(1.0/100.0)
 
-    AS.ATLASLabel(  0.12, 0.96,  r.kBlack, 0.04*2.0, 0.04, "  Simulation Internal")        
-    AS.myText    (  0.12, 0.92,r.kBlack,0.04, AS.lumi_string)    
+    AS.ATLASLabel(  0.15, 0.96,  r.kBlack, 0.04*2.0, 0.04, "  Simulation Internal")        
+    AS.myText    (  0.15, 0.92,r.kBlack,0.04, AS.lumi_string)    
 
 def set_palette(name="palette", ncontours=999):
     """
@@ -359,14 +369,15 @@ def ratio_plot(canvas, histograms,
 
 
     #first evaluate the ratio plots and determine the maximum and minimum y 
-    ratio_hists,  min_y,max_y = rhf.evaluate_ratio_histograms( histograms )
-    max_y = max(max_y*1.3, (2.0 - min_y)*1.3)
-    max_y = 1.3
+    ratio_hists,  max_y,min_y = rhf.evaluate_ratio_histograms( histograms )
+    max_y = max(max_y, (2.0 - min_y))
+    # max_y = 1.3
     min_y = 2.0 - max_y 
+    max_y *= 1.05
+    min_y *= 0.95
 
     same_string = ""
     for name in ratio_hists: 
-
         #separate out the histogram and style options 
         ratio_histogram = ratio_hists[name][0]
         ratio_style_opts = histograms[name][2] #evaluate_ratio_histograms has already removed the unwanted sytyle opions for the upper pannel
