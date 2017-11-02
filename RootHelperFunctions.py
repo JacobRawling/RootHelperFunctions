@@ -1,11 +1,16 @@
 import ROOT as r 
 import sys
 import array
+import os 
 
 def open_file(file_name, option="READ" ):
     f = r.TFile(file_name,option)
     assert f, ("ERROR: failed to open file: ",file_name)
     return f
+
+def create_folder(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
 #
 # Draws a 1D histogram histogram using TTree::Daw
@@ -135,7 +140,20 @@ def evaluate_ratio_histogram(numerator_hist,denonimator_hist):
     ratio_hist.SetDirectory(0)
     return ratio_hist
 
+def GetQuantiles(hist,quants):
+    """ 
+        takes a LIST of quantiles and returns an array of the corresponding x coordinates 
+        of the input histogram hist
+    """
+    quants = array.array('d', [ quant for quant in quants])
+    q = array.array('d', [0.0]*len(quants))
+    hist.GetQuantiles(len(quants), q, quants)
+    return q
+
 def apply_stress(hist,stress):
+    """
+        Stresses a distribution, such that the first bin is increased by a factor 1, and the last by 1 + stress
+    """
     stressed_hist = hist.Clone()
     stressed_hist.SetDirectory(0)
     
@@ -168,7 +186,7 @@ def evaluate_ratio_histograms(histograms ):
             continue
 
         #ensure we've given sensible parameter to this function 
-        assert denominator_hist_name in histograms, "ERROR: Denominator histogram not in input dictioanry."
+        assert denominator_hist_name in histograms, "ERROR: Denominator histogram '"+denominator_hist_name+"'' not in input dictioanry."
         denominator_hist = histograms[denominator_hist_name][0] 
     
         numerator_hist    = histograms[name][0] 
