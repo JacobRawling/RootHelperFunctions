@@ -260,7 +260,7 @@ def plot_histogram(canvas, histograms, x_axis_title = "x", y_axis_title="Normali
     #divide the canvas into 
     canvas.Clear()
     canvas.cd()
-
+    canvas.SetLeftMargin(0.2)
     AS.SetAtlasStyle()
     r.gStyle.SetOptStat(0)
     r.gPad.Update()
