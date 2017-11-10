@@ -147,6 +147,19 @@ def normalize_migration_matrix(migration_matrix):
              migration_matrix.SetBinContent(i,j,migration)
     return migration_matrix
 
+def times_by_bin_center(hist):
+    hist = hist.Clone()
+    hist.SetDirectory(0)
+    for i in xrange(0,hist.GetSize()):
+        hist.SetBinContent(i,hist.GetBinContent(i)*hist.GetBinCenter(i))
+    return hist
+
+def remove_errors(hist):
+    hist = hist.Clone()
+    hist.SetDirectory(0)
+    for i in xrange(0,hist.GetSize()):
+        hist.SetBinError(i,0)
+    return hist
 
 def hide_root_infomessages():
     r.gErrorIgnoreLevel = 1001#r.kPrint
