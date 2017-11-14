@@ -64,9 +64,10 @@ class StyleOptions:
         self.draw_options="HIST"
 
 data_style_options = StyleOptions(x_label_size = 0.0,
+                                  draw_options = "HIST P",
                                   legend_options = "lp")
 mc_style_options   = StyleOptions(
-                                 draw_options = "E1 HIST",
+                                 draw_options = "HIST",
                                  line_color   = r.kBlue,
                                  line_style   = 3,
                                  fill_color   = r.kWhite,
@@ -248,7 +249,10 @@ def create_legend(histograms):
     r.SetOwnership( legend, 0 ) 
     return legend
 
-def plot_histogram(canvas, histograms, x_axis_title = "x", y_axis_title="Normalized Number of events"):
+def plot_histogram(canvas, histograms, x_axis_title = "x", y_axis_title="Normalized Number of events", 
+                labels = [],
+                do_legend = True, 
+                do_atlas_labels = False):
     '''
         canvas: TCanvas that will be drawn upon 
         histograms: a dictionary of tuples that will be drawn, scuh that 
@@ -264,8 +268,6 @@ def plot_histogram(canvas, histograms, x_axis_title = "x", y_axis_title="Normali
     AS.SetAtlasStyle()
     r.gStyle.SetOptStat(0)
     r.gPad.Update()
-
-    legend = r.TLegend()#0.6,0.8,0.9,0.9)
 
     max_y       = get_maximum_y(histograms)*1.5
     same_string = ""
@@ -284,15 +286,17 @@ def plot_histogram(canvas, histograms, x_axis_title = "x", y_axis_title="Normali
         hist.GetYaxis().SetTitle(y_axis_title)
 
         #draw the histogram
-        legend.AddEntry(hist,name,"l")#style_opts.legend_options)
         hist.Draw(style_opts.draw_options + same_string)
         same_string = " same"
 
 
     #grab and draw the legend     
-    legend = create_legend(histograms)
-    legend.Draw()
-    # draw_atlas_detailslabels, x_pos = 0.15,y_pos = 0.85, text_size = 0.032)
+    if do_legend:
+        legend = create_legend(histograms)
+        legend.Draw()
+
+    if do_atlas_labels:
+        draw_atlas_details(labels, x_pos = 0.15,y_pos = 0.85, text_size = 0.032)
 
 def th1f_to_tgraph(hist):
     x_points, y_points = [],[]
