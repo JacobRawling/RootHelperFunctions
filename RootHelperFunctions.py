@@ -2,6 +2,7 @@ import ROOT as r
 import sys
 import array
 import os 
+from math import sqrt
 
 def open_file(file_name, option="READ" ):
     f = r.TFile(file_name,option)
@@ -11,6 +12,30 @@ def open_file(file_name, option="READ" ):
 def create_folder(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
+
+def convert_up_down_uncert_to_asymmerrors(up_hist,down_hist,y_centre=1.0):
+    x,y,exl,eyl,exh,eyh = array.array('d'),array.array('d'),array.array('d'),array.array('d'),array.array('d'),array.array('d')
+    for i in xrange(up_hist.GetSize()):
+        x.append(up_hist.GetBinCenter(i))
+        y.append(y_centre)
+        exl.append(up_hist.GetBinWidth(i)/2.0)
+        exh.append(up_hist.GetBinWidth(i)/2.0)
+        eyh.append(up_hist.GetBinContent(i))
+        eyl.append(down_hist.GetBinContent(i))
+
+    graph = r.TGraphAsymmErrors(len(x),x,y,exl,exh,eyl,eyh)
+    return graph
+
+
+
+def poisson_fluctuate(hist,random_generator):
+    new_hist = hist.Clone()
+    for i in range(0, hist.GetNbinsX() + 1):
+        old_bin_error = 0
+        if not hist.GetBinContent(i) == 0:
+            #old_bin_error = hist.GetBinError(i)/hist.GetBinContent(i) ###you probably don't need this
+            new_hist.SetBinContent(i, random_generator.Poisson(hist.GetBinContent(i)))
+    return new_hist
 
 #
 # Draws a 1D histogram histogram using TTree::Daw
@@ -41,8 +66,9 @@ def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weigh
         friend_chain.BuildIndex(index_variable)
         chain.BuildIndex(index_variable)
         chain.AddFriend(friend_chain)
+        friend_chain.AddFriend(chain)
 
-
+        
     if isinstance(x_axis_binning,list) == True: 
         htemp = r.TH1F(hist_name,"",len(x_axis_binning)-1,array.array('d',x_axis_binning))
         chain.Draw(variable_name+">>"+hist_name+"", weight, draw_options)
@@ -58,6 +84,23 @@ def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weigh
     htemp.Scale(scale)
     return htemp
 
+def get_histogram_with_chains(chain,variable_name,x_axis_binning,weight,scale = 1.0, draw_options = "e", hist_name = "htemp" ):
+    r.gROOT.SetBatch()        
+
+    if isinstance(x_axis_binning,list) == True: 
+        htemp = r.TH1F(hist_name,"",len(x_axis_binning)-1,array.array('d',x_axis_binning))
+        chain.Draw(variable_name+">>"+hist_name+"", weight, draw_options)
+    else:
+        chain.Draw(variable_name+">>"+hist_name+"("+x_axis_binning+")", weight, draw_options)
+
+    #retrive the histogram from ROOT and free it from this instance in memory 
+    htemp = r.gDirectory.Get(hist_name)
+    assert isinstance(htemp,r.TH1F),( "ERROR: Failed to open get histogram with variable expression",variable," from files", file_list," is type ",type(htemp))
+    htemp.SetDirectory(0)
+
+    #let's the user rescale    
+    htemp.Scale(scale)
+    return htemp
 #
 # Draws a 2D histogram histogram using TTree::Daw 
 #
@@ -120,16 +163,32 @@ def get_2d_histogram(file_name_list,
     htemp.Scale(scale)
     return htemp
 
-def normalize_histogram(hist):
+def normalize_histogram(hist, correct_uncert = False):
     integral = hist.Integral()
     if integral == 0:
         integral = 1
     hist.Scale(1.0/integral)
 
-    ##typcially if we are normalizing it is useful to also set the minimum to zero
-    # hist.SetMinimum(0)
+    if correct_uncert:
+        for i in xrange(1,hist.GetSize()):
+            # hist.SetBinContent(i, hist.GetBinContent(i)/integral)
+            hist.SetBinError(i, (hist.GetBinError(i)/integral ) )
 
     return hist
+
+def extract_errors_to_hist(hist):
+    """
+        Takes the  uncertainty on each bin and sets them as the bin content
+        of the error_hist
+    """
+    error_hist = hist.Clone()
+    error_hist.SetDirectory(0)
+
+    for i in xrange(1, hist.GetSize()):
+        error_hist.SetBinContent(i,hist.GetBinError(i))
+        error_hist.SetBinError(i,0)
+
+    return error_hist 
 
 def normalize_migration_matrix(migration_matrix):
     n_cols = migration_matrix.GetXaxis().GetNbins()
@@ -170,6 +229,26 @@ def evaluate_ratio_histogram(numerator_hist,denonimator_hist):
     ratio_hist.SetDirectory(0)
     return ratio_hist
 
+def shift_hist_yaxis(hist, amount):
+    shifted_hist = hist.Clone()
+    for i in xrange(1,shifted_hist.GetSize()):
+        shifted_hist.SetBinContent(i,shifted_hist.GetBinContent(i)+amount)
+    shifted_hist.SetDirectory(0)
+    return shifted_hist
+
+def bin_by_bin_divide_histogram(numerator_hist,denonimator_hist):
+    ratio_hist = numerator_hist.Clone("ratio_"+numerator_hist.GetName())
+    for i in xrange(1, numerator_hist.GetSize()):
+        try:
+            new_content = numerator_hist.GetBinContent(i)/denonimator_hist.GetBinContent(i)
+        except ZeroDivisionError:
+            new_content = 0.0
+
+        ratio_hist.SetBinContent(i,new_content )
+
+    ratio_hist.SetDirectory(0)
+    return ratio_hist
+
 def GetQuantiles(hist,quants):
     """ 
         takes a LIST of quantiles and returns an array of the corresponding x coordinates 
@@ -179,6 +258,26 @@ def GetQuantiles(hist,quants):
     q = array.array('d', [0.0]*len(quants))
     hist.GetQuantiles(len(quants), q, quants)
     return q
+
+def combine_bincenters_in_quadrature(hists):
+    combination = hists[0].Clone()
+
+    for i in xrange(1,combination.GetSize()):
+        total = 0.0
+        for h in hists:
+          total += h.GetBinContent(i)**2
+
+        total = sqrt(total)
+        combination.SetBinContent(i,total)
+        combination.SetBinError(i,0)
+    combination.SetDirectory(0)
+    return combination
+
+def clear_histogram(hist):
+    for i in xrange(0,hist.GetSize()):
+        hist.SetBinContent(i,0)
+        hist.SetBinError(i,0)
+    return hist
 
 def apply_stress(hist,stress):
     """
@@ -233,4 +332,33 @@ def evaluate_ratio_histograms(histograms ):
         ratio_hists[name].append( ratio_style_opts)
     
     return ratio_hists, max_y,min_y
+
+def shift_bins(hist, shift_index):
+    """
+        brief: sequentially moves the all the bins and lables from shift index to 1
+
+        params: 
+            - hist: TH1 histograms
+            - shift_index: Starting index of bin that shall be moved.
+    """
+
+    #create acopy and free it from ROOT's memory managemnet 
+    hist = hist.Clone()
+    hist.SetDirectory(0)
+
+    # 
+    for i in xrange(1,hist.GetSize()-1):
+        if i + shift_index <= hist.GetSize()-1:
+            # we want to move bins if possible
+            new_label   = hist.GetXaxis().GetBinLabel(i+shift_index)
+            new_content = hist.GetBinContent(i+shift_index)
+
+            hist.GetXaxis().SetBinLabel(i, new_label)
+            hist.SetBinContent(i, new_content)
+        else:
+            #otherwise, just remove the lable and set the content to zero
+            hist.SetBinContent(i,0)
+            hist.GetXaxis().SetBinLabel(i,"")
+
+    return hist
 
