@@ -29,11 +29,15 @@ def convert_up_down_uncert_to_asymmerrors(up_hist,down_hist,y_centre=1.0):
 
 
 def poisson_fluctuate(hist,random_generator):
+    """ 
+        Go bin by bin and fluctuate the contents
+
+        hist: TH1F of bins
+        random_generator: TRandom3
+    """
     new_hist = hist.Clone()
-    for i in range(0, hist.GetNbinsX() + 1):
-        old_bin_error = 0
+    for i in range(1, hist.GetNbinsX() + 1):
         if not hist.GetBinContent(i) == 0:
-            #old_bin_error = hist.GetBinError(i)/hist.GetBinContent(i) ###you probably don't need this
             new_hist.SetBinContent(i, random_generator.Poisson(hist.GetBinContent(i)))
     return new_hist
 
@@ -41,6 +45,26 @@ def poisson_fluctuate(hist,random_generator):
 # Draws a 1D histogram histogram using TTree::Daw
 def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weight,scale = 1.0, draw_options = "e", hist_name = "htemp", friend_name = None,
                      index_variable = None ):
+    """
+        Parameters:
+            file_name_list: either a list of input files, in which case a TChain will be used to draw from  
+                            all files in the list, OR a string. If a string then a TTRee will be retrieved
+                            and drawn from
+
+            ntuple_name: self evident.
+            variable_name: the string that will be drawn in the TTree::Draw command
+            weight: weighting factor for each event in the draw command.
+            scale:  A factor to change the histograms scale by 
+            hist_name: the ROOT name of the histogram generated 
+            friend_name: if set a friend tree is assumed to exist in the file, it will be read nad added as a friend
+                         and thus accessible in TTree:Draw commands
+            index_variable: a string for the index variable that will be built and used to sync the friend tree and the default ntuple
+
+        return values:
+            A TH1F histogram that has been freed from root memory managemnt (i.e SetDirectory(0))
+        
+    """
+
     r.gROOT.SetBatch()
     chain = r.TChain(ntuple_name)
 
@@ -83,6 +107,37 @@ def get_histogram(file_name_list,ntuple_name, variable_name,x_axis_binning,weigh
     #let's the user rescale    
     htemp.Scale(scale)
     return htemp
+def convert_list_of_hists_to_heatmap(list_of_hists, x_axis_binning, n_bins = None):
+    """
+    """
+    if n_bins == None:
+        n_bins = len(list_of_hists)*3
+
+    min_y, max_y = {},{}
+    for bin in xrange(1,len(x_axis_binning)+1):
+            min_y[bin] = 99999999
+            max_y[bin] = -99999999
+
+    for hist in list_of_hists:
+        for bin in xrange(1,hist.GetNbinsX()+1):
+            min_y[bin] = min(hist.GetBinContent(bin),min_y[bin])
+            max_y[bin] = max(hist.GetBinContent(bin),max_y[bin])
+
+    abs_min_y, abs_max_y = 99999999,-99999999
+    for bin in xrange(1,hist.GetNbinsX()+1):
+            abs_min_y = min(min_y[bin],abs_min_y)
+            abs_max_y = max(max_y[bin],abs_max_y)
+    
+    abs_min_y *= 0.75
+    abs_max_y *= 1.25    
+    heatmap = r.TH2F(list_of_hists[-1].GetName() + "_heatmap","",len(x_axis_binning)-1,array.array('d',x_axis_binning),
+                                                                 n_bins,abs_min_y,abs_max_y)
+    for hist in list_of_hists:
+        for bin in xrange(1,hist.GetNbinsX()+1):
+            heatmap.Fill( x_axis_binning[bin-1], hist.GetBinContent(bin) )
+
+    heatmap.SetDirectory(0)
+    return heatmap
 
 def get_histogram_with_chains(chain,variable_name,x_axis_binning,weight,scale = 1.0, draw_options = "e", hist_name = "htemp" ):
     r.gROOT.SetBatch()        
@@ -161,6 +216,23 @@ def get_2d_histogram(file_name_list,
 
     #let's the user rescale    
     htemp.Scale(scale)
+    return htemp
+
+def retrive_hist(file_name,hist_name):
+    ftemp    = open_file(file_name)
+    if not isinstance(ftemp,r.TFile):
+        print "ERROR: Failed to open file", file_name 
+        exit(-1) 
+
+    htemp = ftemp.Get(hist_name)
+    if not isinstance(htemp,r.TH1F) and not isinstance(htemp, r.TH1D):
+        print "ERROR: Couldn't get hist: ", hist_name
+        print "\t IS of type: ", type(htemp)
+        print "\t From file", file_name
+        print "\t Exiting..."
+        exit(-1)
+    htemp.SetDirectory(0)
+    ftemp.Close()
     return htemp
 
 def normalize_histogram(hist, correct_uncert = False):
@@ -292,7 +364,7 @@ def apply_stress(hist,stress):
 
     return stressed_hist
 
-def evaluate_ratio_histograms(histograms ):
+def evaluate_ratio_histograms(histograms, additional_ratio_graphs = {} ):
     '''
         brief: turns a dictionary of histograms and key for the denominator histogram into a dictionary of ratio plots 
     
@@ -303,7 +375,16 @@ def evaluate_ratio_histograms(histograms ):
                     }
                     style_otion is an instance of the above class StyleOptions, name is a string and histogram is a TH1F 
                     ratio_hist_string is the name of the histogram to divide this one by, if it's None then the histogram is not added to the returned histograms
-    
+
+        evaluate_ratio_histograms: an dictionary of tuples that are not to be processed. Instead they are passed for inclusion of the max_y,min_y limit 
+                                   Of the format: 
+                                    {
+                                     histogram_name: (histogram, style_options, ratio_style_options, ratio_hist_string), 
+                                     histogram_2_name: (histogram_2, style_option_2, ratio_style_options_2, ratio_hist_string),
+                                    }
+                                    style_otion is an instance of the above class StyleOptions, name is a string and histogram is a TH1F 
+                                    ratio_hist_string is the name of the histogram to divide this one by, if it's None then the histogram is not added to the returned histograms
+
     '''      
     ratio_hists = {}
     
@@ -331,6 +412,11 @@ def evaluate_ratio_histograms(histograms ):
         ratio_hists[name].append( r_plot)
         ratio_hists[name].append( ratio_style_opts)
     
+    for name in additional_ratio_graphs:
+        for i in xrange(1,additional_ratio_graphs[name][0].GetN()-1):
+            max_y = max(1+additional_ratio_graphs[name][0].GetErrorYhigh(i) , max_y)
+            min_y = min(1-additional_ratio_graphs[name][0].GetErrorYlow(i) , min_y)
+
     return ratio_hists, max_y,min_y
 
 def shift_bins(hist, shift_index):
