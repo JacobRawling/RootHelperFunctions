@@ -417,7 +417,7 @@ def evaluate_ratio_histograms(histograms, additional_ratio_graphs = {} ):
             max_y = max(1+additional_ratio_graphs[name][0].GetErrorYhigh(i) , max_y)
             min_y = min(1-additional_ratio_graphs[name][0].GetErrorYlow(i) , min_y)
 
-    return ratio_hists, max_y,min_y
+    return ratio_hists#, max_y,min_y
 
 def shift_bins(hist, shift_index):
     """

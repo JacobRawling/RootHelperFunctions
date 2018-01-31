@@ -266,6 +266,38 @@ def get_truth_large_legend_stlye_opt(count, is_ratio,show_legend = True):
         truth_leg_ratio_style_options.x_axis_label_offset = None
         return truth_leg_ratio_style_options
 
+def get_large_legend_stlye_opt(count, is_ratio,show_legend = True):
+        colors = [r.kOrange+1, r.kGreen + 2, r.kAzure -2,r.kAzure +2, r.kMagenta -2, r.kMagenta+2]
+        max_count = len(colors)
+        line_styles = [1,2,4,5,3,7,8,9 ]
+        markers = [34,20,24,21,25,22,26,23,32]
+
+        #set the drawing style options options to be nice 
+        truth_leg_style_options= StyleOptions(
+                             draw_options = "HIST",
+                             line_style   = line_styles[count%len(line_styles)],
+                             line_width   = 4,
+                             fill_color   = r.kWhite,
+                             fill_style   = 0,
+                             marker_color = r.kBlack,
+                             marker_style = 0,
+                             marker_size  = 0,
+                             x_label_size   = 0.05,
+                             x_title_size   = 0.05,
+                             x_title_offset = 1.25,
+                             y_title_offset = 1.45,
+                             legend_options = "l" if show_legend else None,
+                             line_color = colors[count%max_count] 
+                             )
+        if not is_ratio:
+            return truth_leg_style_options
+
+        #ratio is basically the same except the label sizes and things are changed a bit 
+        truth_leg_ratio_style_options=deepcopy(truth_leg_style_options)
+        truth_leg_ratio_style_options.set_default_ratio_options()
+        truth_leg_ratio_style_options.x_axis_label_offset = None
+        return truth_leg_ratio_style_options
+
 def get_uncert_stlye_opt(is_ratio = False, show_legend = True ):
 
         #set the drawing style options options to be nice 
@@ -511,49 +543,96 @@ def draw_atlas_details(labels=[],x_pos= 0.2,y_pos = 0.87, dy = 0.045,text_space=
         y_pos -= dy
 
 def get_maximum_y(histograms):
+    # max_y = -1
+    # for name in histograms:
+    #     max_y = max(histograms[name][0].GetMaximum(),max_y)
+    # return max_y
     max_y = -1
     for name in histograms:
-        if histograms[name][0].GetMaximum() > max_y:
-            max_y = histograms[name][0].GetMaximum()
+        try: 
+            for i in xrange(1,histograms[name][0].GetN()-1):
+                # Allow for (somehow) the point of Y exceeding the error 
+                max_y = max(max(histograms[name][0].GetY()[i]+histograms[name][0].GetErrorYhigh(i) , histograms[name][0].GetY()[i] ), max_y)
+        except AttributeError:
+            for i in xrange(1,histograms[name][0].GetNbinsX()+1):
+                max_y = max(histograms[name][0].GetBinContent(i), max_y)
     return max_y
 
-def get_minimum_y(histograms):
+def get_minimum_y(histograms, verbose = 0):
+
     min_y = 1000000000000
     for name in histograms:
-        if histograms[name][0].GetMinimum() < min_y:
-            min_y = histograms[name][0].GetMinimum()
+        if verbose > 0:
+            print "hist name: ",name, type(histograms[name][0])
+            print "min_y before: ", min_y
+        # We might be handing a TGraphAsymmErrors OR a TH1F, try acting as if it's
+        # a TGraph, and just catch the exception if it isn't 
+        try: 
+            for i in xrange(1,histograms[name][0].GetN()-1):
+                # Allow for (somehow) the point of Y exceeding the error 
+                if verbose > 0:
+                    print "Y: ",histograms[name][0].GetY()[i], "EY",histograms[name][0].GetErrorYlow(i)
+                min_y = min(min(histograms[name][0].GetY()[i]-histograms[name][0].GetErrorYlow(i) , histograms[name][0].GetY()[i] ), min_y)
+        except AttributeError:
+            for i in xrange(1,histograms[name][0].GetNbinsX()+1):
+                if verbose > 0:
+                    print "Y: ",histograms[name][0].GetBinContent(i)
+                min_y = min(histograms[name][0].GetBinContent(i), min_y)
+        if verbose > 0:
+            print "min_y after: ", min_y, "\n"
+
+    # min_y = 1000000000000
+    # for name in histograms:
+    #     if verbose > 0:
+    #         print "hist name: ",name
+    #         print "min_y before: ", min_y
+    #     # ROOT uses -1111 for histograms whose minimum has not been set 
+    #     new_min = histograms[name][0].GetMinimum() if histograms[name][0].GetMinimum() != -1111 else 1e6
+    #     min_y = min(new_min,min_y)
+    #     if verbose > 0:
+    #         print "min_y after: ", min_y, "\n"
     return min_y
 
-def create_legend(histograms,x_pos = None, y_pos = 0.9,additional_entry_sizes=0):
+def create_legend(histograms,x_pos = None, y_pos = 0.9,additional_entry_sizes=0, leg_font_size = None):
     r.gStyle.SetFrameBorderSize(0)
     r.gStyle.SetLegendBorderSize(0)
     r.gStyle.SetLegendFont(42)
 
+    # find how many things we have in the legend 
     n_leg = additional_entry_sizes
     for name in histograms:      
         if histograms[name][1].legend_options != None:
             n_leg += 1
-    if n_leg > 4 and n_leg < 6:
+    
+    # Calculate thecorrect font size and the approriate 
+    # spacing inbeween points
+    if leg_font_size == None:
+        dy = 0.05 
+        leg_font_size = 0.03
+        if n_leg > 4:
+            leg_font_size = 0.02 
+    else:
+        dy = 0.05 *(leg_font_size/0.02)
+
+    if n_leg > 4 and n_leg <= 8:
         if x_pos == None:
             x_pos = 0.55
 
-        legend = r.TLegend(x_pos,  y_pos-(n_leg/2.0)*0.05,
+        legend = r.TLegend(x_pos,  y_pos-(n_leg/2.0)*dy,
                            0.925, y_pos)
-    elif n_leg > 6:
+    elif n_leg > 8:
         if x_pos == None:
             x_pos = 0.22
         # legend = r.TLegend(0.22,y_pos-(n_leg/3.0)*0.05,y_pos,0.9)
-        legend = r.TLegend(x_pos,  y_pos-(n_leg/4.0)*0.05,
+        legend = r.TLegend(x_pos,  y_pos-(n_leg/4.0)*dy,
                            0.925, y_pos)
     else:
         if x_pos == None:
             x_pos = 0.635
-        legend = r.TLegend(x_pos, y_pos-n_leg*0.05,
+        legend = r.TLegend(x_pos, y_pos-n_leg*dy,
                            0.925, y_pos)
-    legend.SetTextSize(0.03)
-    if n_leg > 4:
-        legend.SetTextSize(0.02)
 
+    legend.SetTextSize(leg_font_size)
     legend.SetFillColor(0)
     legend.SetLineWidth(0)
     legend.SetFillStyle(0)
@@ -595,8 +674,8 @@ def plot_histogram(canvas, histograms, x_axis_title = "x", y_axis_title="Normali
     r.gStyle.SetOptStat(0)
     r.gPad.Update()
 
-    max_y       = get_maximum_y(histograms)*1.7
-    min_y       = get_minimum_y(histograms)*1.15
+    max_y       = get_maximum_y(histograms)*1.35
+    min_y       = get_minimum_y(histograms)*0.9
     if force_zero_min:
         min_y = 0
     same_string = ""
@@ -651,7 +730,8 @@ def ratio_plot(canvas, histograms,
             y_axis_title="Normalzied Number of Events", 
             x_axis_title="",
             ratio_histograms = {},
-            messages = []):
+            messages = [],
+            leg_font_size = None):
     '''
         canvas: TCanvas that will be drawn upon
         histograms: an dictionary of tuples such that 
@@ -718,7 +798,7 @@ def ratio_plot(canvas, histograms,
     # all_legend_histograms.update(ratio_histograms)
     #copy the ratio histograms across to histograms at the end 
     # that way they appear as the last items in the legend/
-    legend = create_legend(histograms,x_pos = 0.635,additional_entry_sizes = len(ratio_histograms))
+    legend = create_legend(histograms,x_pos = 0.56,additional_entry_sizes = len(ratio_histograms),leg_font_size = leg_font_size)
     for name in ratio_histograms:
         if ratio_histograms[name][1].legend_options != None:
             legend.AddEntry(ratio_histograms[name][0],name,ratio_histograms[name][1].legend_options)
@@ -735,14 +815,11 @@ def ratio_plot(canvas, histograms,
 
 
     #first evaluate the ratio plots and determine the maximum and minimum y 
-    ratio_hists,  max_y,min_y = rhf.evaluate_ratio_histograms( histograms, additional_ratio_graphs =ratio_histograms  )
-    #
-    max_y = max(max_y, (2.0 - min_y))
-    # max_y = 1.3
-    min_y = 2.0 - max_y 
-    max_y *= 1.05
-    min_y *= 0.95
+    ratio_hists = rhf.evaluate_ratio_histograms( histograms, additional_ratio_graphs =ratio_histograms  )
+   
 
+    max_y = get_maximum_y( dict(ratio_hists,**ratio_histograms))*1.05
+    min_y = get_minimum_y( dict(ratio_hists,**ratio_histograms))*0.95 #
     same_string = ""
 
     # we need an axis to be drawn so that the TGRaphs can be drawn over them 
@@ -756,6 +833,7 @@ def ratio_plot(canvas, histograms,
         #format the histogram
         ratio_histogram.SetMaximum(max_y) 
         ratio_histogram.SetMinimum(min_y) 
+
         r.TGaxis.SetMaxDigits(3)
         ratio_hists[name][0] = ratio_histogram = set_style_options(ratio_histogram,ratio_style_opts)
         
