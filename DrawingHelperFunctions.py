@@ -81,17 +81,17 @@ mc_style_options   = StyleOptions(
                                  marker_color = r.kBlack,
                                  marker_style = 0,
                                  marker_size  = 0,
-                                 x_label_size = 0.0
+                                 # x_label_size = 0.135
                                  )
 data_ratio_style_options = StyleOptions(
     y_divisions    = 503,
     y_label_size   = 0.135,
     y_title_size   = 0.135,
     y_title_offset = 0.45,
-    x_label_size    = 0.135,
+    x_label_size   = 0.135,
+    # x_axis_label_offset    = 0.87,
     x_title_size    = 0.135,
-    x_title_offset  = 0.87,
-    x_axis_label_offset = 0.87,
+    x_title_offset  = 0.95,
     y_axis_label_offset = None,
     draw_options="HIST"
     )
@@ -274,7 +274,7 @@ def get_large_legend_stlye_opt(count, is_ratio,show_legend = True):
 
         #set the drawing style options options to be nice 
         truth_leg_style_options= StyleOptions(
-                             draw_options = "HIST",
+                             draw_options = "HIST E1",
                              line_style   = line_styles[count%len(line_styles)],
                              line_width   = 4,
                              fill_color   = r.kWhite,
@@ -282,7 +282,7 @@ def get_large_legend_stlye_opt(count, is_ratio,show_legend = True):
                              marker_color = r.kBlack,
                              marker_style = 0,
                              marker_size  = 0,
-                             x_label_size   = 0.05,
+                             # x_label_size   = 0.05,
                              x_title_size   = 0.05,
                              x_title_offset = 1.25,
                              y_title_offset = 1.45,
@@ -296,6 +296,8 @@ def get_large_legend_stlye_opt(count, is_ratio,show_legend = True):
         truth_leg_ratio_style_options=deepcopy(truth_leg_style_options)
         truth_leg_ratio_style_options.set_default_ratio_options()
         truth_leg_ratio_style_options.x_axis_label_offset = None
+        truth_leg_ratio_style_options.x_axis_label = None
+        truth_leg_ratio_style_options.draw_options = "HIST E1"
         return truth_leg_ratio_style_options
 
 def get_uncert_stlye_opt(is_ratio = False, show_legend = True ):
@@ -731,7 +733,8 @@ def ratio_plot(canvas, histograms,
             x_axis_title="",
             ratio_histograms = {},
             messages = [],
-            leg_font_size = None):
+            leg_font_size = None,
+            set_log_y = False):
     '''
         canvas: TCanvas that will be drawn upon
         histograms: an dictionary of tuples such that 
@@ -767,13 +770,16 @@ def ratio_plot(canvas, histograms,
     pad1.SetTopMargin(0.06)
     pad1.Draw()
     pad1.cd()
-
+    if set_log_y:
+        pad1.SetLogy()
     # upper pannel 
     same_string = ""
 
     #grab the y axis maximum so we can set every histogram to have this same maximum 
     n_leg  = 0
     max_y       = get_maximum_y(histograms)*1.35
+    if set_log_y:
+        max_y = get_maximum_y(histograms)*13.5
     for name in histograms: 
         #for clarity cache the histogram and styling options separately
         hist = histograms[name][0]
@@ -824,12 +830,12 @@ def ratio_plot(canvas, histograms,
 
     # we need an axis to be drawn so that the TGRaphs can be drawn over them 
     # I appreciate this is a nasty and messy way of doing this 
-    # but it works so... 
+    # but it works so... first draw the histograms
     for name in ratio_hists: 
         #separate out the histogram and style options 
         ratio_histogram = ratio_hists[name][0]
         ratio_style_opts = histograms[name][2] #evaluate_ratio_histograms has already removed the unwanted sytyle opions for the upper pannel
-        
+
         #format the histogram
         ratio_histogram.SetMaximum(max_y) 
         ratio_histogram.SetMinimum(min_y) 
@@ -863,6 +869,7 @@ def ratio_plot(canvas, histograms,
 
     # Overlay the TGraphs with the ratios of the upper pannel 
     for name in ratio_hists: 
+
         #separate out the histogram and style options 
         ratio_histogram = ratio_hists[name][0]
         ratio_style_opts = histograms[name][2] #evaluate_ratio_histograms has already removed the unwanted sytyle opions for the upper pannel
@@ -879,6 +886,13 @@ def ratio_plot(canvas, histograms,
 
         #draw the histogram keeping track of what is the same
         ratio_histogram.Draw(ratio_style_opts.draw_options + same_string)
+        if "E1" in ratio_style_opts.draw_options:
+            ratio_histogram.Draw("E1 SAME")
+        if "E2" in ratio_style_opts.draw_options:
+            ratio_histogram.Draw("E2 SAME")
+        if "E3" in ratio_style_opts.draw_options:
+            ratio_histogram.Draw("E3 SAME")
+
         same_string = " SAME "
 
     return ratio_hists 
